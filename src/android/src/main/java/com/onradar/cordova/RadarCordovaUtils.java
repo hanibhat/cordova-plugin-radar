@@ -6,13 +6,13 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import com.onradar.sdk.Radar;
-import com.onradar.sdk.model.RadarEvent;
-import com.onradar.sdk.model.RadarGeofence;
-import com.onradar.sdk.model.RadarUser;
-import com.onradar.sdk.model.RadarUserInsights;
-import com.onradar.sdk.model.RadarUserInsightsLocation;
-import com.onradar.sdk.model.RadarUserInsightsState;
+import io.radar.sdk.Radar;
+import io.radar.sdk.model.RadarEvent;
+import io.radar.sdk.model.RadarGeofence;
+import io.radar.sdk.model.RadarUser;
+import io.radar.sdk.model.RadarUserInsights;
+import io.radar.sdk.model.RadarUserInsightsLocation;
+import io.radar.sdk.model.RadarUserInsightsState;
 
 class RadarCordovaUtils {
 

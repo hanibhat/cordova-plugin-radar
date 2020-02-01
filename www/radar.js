@@ -39,10 +39,6 @@ radarExport.setPlacesProvider = function(provider) {
 	exec(() => {}, null, "setPlacesProvider", [provider]);
 };
 
-radarExport.getPermissionsStatus = function(callback) {
-	exec(callback, null, "getPermissionsStatus", []);
-};
-
 radarExport.trackOnce = function(callback) {
 	exec(callback, null, "trackOnce", []);
 };

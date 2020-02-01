@@ -1,5 +1,19 @@
 package com.onradar.cordova;
 
+import android.app.PendingIntent;
+import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.Manifest;
+import android.support.v4.content.ContextCompat;
+import android.support.v4.app.ActivityCompat;
+
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.os.Build;
+import android.provider.Settings;
+import android.support.v4.app.NotificationCompat;
+
 import android.app.Activity;
 import android.content.Context;
 import android.location.Location;
@@ -13,11 +27,11 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import com.onradar.sdk.Radar;
-import com.onradar.sdk.RadarReceiver;
-import com.onradar.sdk.RadarCallback;
-import com.onradar.sdk.model.RadarEvent;
-import com.onradar.sdk.model.RadarUser;
+import io.radar.sdk.Radar;
+import io.radar.sdk.RadarReceiver;
+import io.radar.sdk.Radar.RadarCallback;
+import io.radar.sdk.model.RadarEvent;
+import io.radar.sdk.model.RadarUser;
 
 public class RadarCordovaPlugin extends CordovaPlugin {
 
@@ -33,10 +47,6 @@ public class RadarCordovaPlugin extends CordovaPlugin {
             setDescription(args, callbackContext);
         else if (action.equals("setPlacesProvider"))
             setPlacesProvider(args, callbackContext);
-        else if (action.equals("getPermissionsStatus"))
-            getPermissionsStatus(args, callbackContext);
-        else if (action.equals("requestPermissions"))
-            requestPermissions(args, callbackContext);
         else if (action.equals("startTracking"))
             startTracking(args, callbackContext);
         else if (action.equals("stopTracking"))
@@ -66,22 +76,78 @@ public class RadarCordovaPlugin extends CordovaPlugin {
     public void init(final JSONArray args, final CallbackContext callbackContext) throws JSONException {
         final String key = args.getString(0);
 
-        final Activity activity = this.cordova.getActivity();
-        Radar.initialize(activity, key);
+        Radar.initialize(key);
 
-        if (!Radar.checkSelfPermissions()) {
-            Radar.requestPermissions(activity);
+        final Activity activity = this.cordova.getActivity();
+
+        // Here, thisActivity is the current activity
+        if (ContextCompat.checkSelfPermission(thisActivity,
+                Manifest.permission.READ_CONTACTS)
+                != PackageManager.PERMISSION_GRANTED) {
+
+            // Permission is not granted
+            // Should we show an explanation?
+            if (ActivityCompat.shouldShowRequestPermissionRationale(thisActivity,
+                    Manifest.permission.READ_CONTACTS)) {
+                // Show an explanation to the user *asynchronously* -- don't block
+                // this thread waiting for the user's response! After the user
+                // sees the explanation, try again to request the permission.
+            } else {
+                // No explanation needed; request the permission
+                ActivityCompat.requestPermissions(thisActivity,
+                        new String[]{Manifest.permission.READ_CONTACTS},
+                        MY_PERMISSIONS_REQUEST_READ_CONTACTS);
+
+                // MY_PERMISSIONS_REQUEST_READ_CONTACTS is an
+                // app-defined int constant. The callback method gets the
+                // result of the request.
+            }
+        } else {
+            // Permission has already been granted
         }
 
-        callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.OK));
+//         TODO: Call the corresponding methods on ActivityCompat and ContextCompat instead
+//          https://developer.android.com/training/permissions/requesting
+      /*  if (!Radar.checkSelfPermissions()) {
+            Radar.requestPermissions(activity);
+        }*/
+
+        notify("Title", "text");
+    }
+
+    private void notify(String title, String text) {
+        Context context = this.cordova.getActivity().getApplicationContext();
+        Intent intent = new Intent(context, RadarCordovaPlugin.class);
+        intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        PendingIntent pending = PendingIntent.getActivity(context, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT);
+
+        NotificationManager notificationManager =
+                (NotificationManager)context.getSystemService(android.content.Context.NOTIFICATION_SERVICE);
+        String channelName = "Kalimny";
+        if (Build.VERSION.SDK_INT >= 26) {
+            NotificationChannel
+                    channel = new NotificationChannel(channelName, channelName,  NotificationManager.IMPORTANCE_HIGH);
+            notificationManager.createNotificationChannel(channel);
+        }
+
+        Notification notification = new NotificationCompat.Builder(context, channelName)
+                .setContentTitle(title)
+                .setContentText(text)
+                .setAutoCancel(true)
+                .setContentIntent(pending)
+                .setSmallIcon(io.radar.sdk.R.drawable.notification)
+                .setSound(Settings.System.DEFAULT_NOTIFICATION_URI)
+                .build();
+
+        notificationManager.notify("Tag", 1111, notification);
     }
 
     public void setUserId(final JSONArray args, final CallbackContext callbackContext) throws JSONException {
-          final String userId = args.getString(0);
+        final String userId = args.getString(0);
 
-          Radar.setUserId(userId);
+        Radar.setUserId(userId);
 
-          callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.OK));
+        callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.OK));
     }
 
     public void setDescription(final JSONArray args, final CallbackContext callbackContext) throws JSONException {
@@ -102,20 +168,6 @@ public class RadarCordovaPlugin extends CordovaPlugin {
             p = Radar.RadarPlacesProvider.NONE;
         }
         Radar.setPlacesProvider(p);
-
-        callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.OK));
-    }
-
-    public void getPermissionsStatus(final JSONArray args, final CallbackContext callbackContext) throws JSONException {
-        boolean hasPermissions = Radar.checkSelfPermissions();
-
-        String str = RadarCordovaUtils.stringForPermissionsStatus(hasPermissions);
-
-        callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.OK, str));
-    }
-
-    public void requestPermissions(final JSONArray args, final CallbackContext callbackContext) throws JSONException {
-        Radar.requestPermissions(this.cordova.getActivity());
 
         callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.OK));
     }
@@ -151,25 +203,25 @@ public class RadarCordovaPlugin extends CordovaPlugin {
 
 
     public void trackOnce(final JSONArray args, final CallbackContext callbackContext) throws JSONException {
-      Radar.trackOnce(new RadarCallback() {
-          @Override
-          public void onCallback(Radar.RadarStatus status, Location location, RadarEvent[] events, RadarUser user) {
-              try {
-                  JSONObject obj = new JSONObject();
-                  obj.put("status", RadarCordovaUtils.stringForStatus(status));
-                  if (location != null)
-                      obj.put("location", RadarCordovaUtils.jsonObjectForLocation(location));
-                  if (events != null)
-                      obj.put("events", RadarCordovaUtils.jsonArrayForEvents(events));
-                  if (user != null)
-                      obj.put("user", RadarCordovaUtils.jsonObjectForUser(user));
+        Radar.trackOnce(new RadarCallback() {
+            @Override
+            public void onComplete(Radar.RadarStatus status, Location location, RadarEvent[] events, RadarUser user) {
+                try {
+                    JSONObject obj = new JSONObject();
+                    obj.put("status", RadarCordovaUtils.stringForStatus(status));
+                    if (location != null)
+                        obj.put("location", RadarCordovaUtils.jsonObjectForLocation(location));
+                    if (events != null)
+                        obj.put("events", RadarCordovaUtils.jsonArrayForEvents(events));
+                    if (user != null)
+                        obj.put("user", RadarCordovaUtils.jsonObjectForUser(user));
 
-                  callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.OK, obj));
-              } catch (JSONException e) {
-                  callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.JSON_EXCEPTION));
-              }
-          }
-      });
+                    callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.OK, obj));
+                } catch (JSONException e) {
+                    callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.JSON_EXCEPTION));
+                }
+            }
+        });
     }
 
     public void updateLocation(final JSONArray args, final CallbackContext callbackContext) throws JSONException {
@@ -186,7 +238,7 @@ public class RadarCordovaPlugin extends CordovaPlugin {
 
         Radar.updateLocation(location, new RadarCallback() {
             @Override
-            public void onCallback(Radar.RadarStatus status, Location location, RadarEvent[] events, RadarUser user) {
+            public void onComplete(Radar.RadarStatus status, Location location, RadarEvent[] events, RadarUser user) {
                 try {
                     JSONObject obj = new JSONObject();
                     obj.put("status", RadarCordovaUtils.stringForStatus(status));
@@ -224,7 +276,7 @@ public class RadarCordovaPlugin extends CordovaPlugin {
     public static class RadarCordovaReceiver extends RadarReceiver {
 
         @Override
-        public void onEventsReceived(@NonNull Context context, @NonNull RadarEvent[] events, @NonNull RadarUser user) {
+        public void onEventsReceived(Context context, RadarEvent[] events, RadarUser user) {
             if (RadarCordovaPlugin.eventsCallbackContext == null)
                 return;
 
@@ -242,7 +294,7 @@ public class RadarCordovaPlugin extends CordovaPlugin {
         }
 
         @Override
-        public void onError(@NonNull Context context, @NonNull Radar.RadarStatus status) {
+        public void onError(Context context, Radar.RadarStatus status) {
             if (RadarCordovaPlugin.errorCallbackContext == null)
                 return;
 
@@ -259,5 +311,4 @@ public class RadarCordovaPlugin extends CordovaPlugin {
         }
 
     }
-
 }
